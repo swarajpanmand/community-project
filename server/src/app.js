@@ -6,13 +6,14 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const mongoose = require('mongoose');
+require('dotenv').config();
 
 const app = express();
 app.use(cors());
 const upload = multer({ dest: 'uploads/' });
 
 // Connect to MongoDB
-mongoose.connect('mongodb://localhost:27017/complaints_db', { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('Could not connect to MongoDB', err));
 
@@ -46,7 +47,7 @@ app.post('/api/read-plate', upload.single('upload'), async (req, res) => {
     const response = await fetch('https://api.platerecognizer.com/v1/plate-reader/', {
       method: 'POST',
       headers: {
-        Authorization: 'Token afe042b0d1a25df562e59bce47ad1a9dddf171e7',
+        Authorization: process.env.PLATE_RECOGNIZER_API_KEY,
       },
       body: body,
     });
@@ -100,5 +101,5 @@ app.get('/api/complaints', async (req, res) => {
 // Serve uploaded images
 app.use('/uploads', express.static('uploads'));
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
