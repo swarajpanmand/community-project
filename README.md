@@ -14,7 +14,7 @@ The Road Safety Complaint System is a web application that allows users to file 
 
 ## Technology Stack
 
-- *Frontend*: React, React Router
+- **Frontend**: React, React Router
 - **Backend**: Express.js, Multer, Mongoose
 - **Database**: MongoDB
 - **License Plate Recognition API**: Plate Recognizer API
