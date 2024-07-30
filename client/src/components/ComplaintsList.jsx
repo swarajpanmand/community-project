@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '@clerk/clerk-react';
 import '../styles/RoadSafety.css';
 
 const ComplaintsList = () => {
   const [complaints, setComplaints] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const { getToken } = useAuth();
 
   useEffect(() => {
     const fetchComplaints = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/complaints');
+        const token = await getToken();
+        const response = await axios.get('http://localhost:5000/api/complaints', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         setComplaints(response.data);
       } catch (error) {
         console.error('Error fetching complaints:', error);
@@ -21,7 +26,7 @@ const ComplaintsList = () => {
     };
 
     fetchComplaints();
-  }, []);
+  }, [getToken]);
 
   if (isLoading) return <div className="loading">Loading...</div>;
   if (error) return <div className="error">Error: {error}</div>;

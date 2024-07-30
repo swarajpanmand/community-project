@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '@clerk/clerk-react';
 import '../styles/RoadSafety.css';
 
 const ComplaintForm = () => {
@@ -13,6 +14,7 @@ const ComplaintForm = () => {
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const { getToken } = useAuth();
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -100,8 +102,12 @@ const ComplaintForm = () => {
     if (image) formData.append('image', image);
 
     try {
+      const token = await getToken();
       await axios.post('http://localhost:5000/api/complaints', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
+        }
       });
       setComplaint('');
       setImage(null);

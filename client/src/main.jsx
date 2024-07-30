@@ -1,10 +1,14 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
-import './styles/index.css'
+import React from 'react';
+import ReactDOM from 'react-dom';
+import { ClerkProvider, RedirectToSignIn, SignedIn, SignedOut } from '@clerk/clerk-react';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App';
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
+const clerkFrontendApi = "pk_test_cHJvdmVuLXRlcm1pdGUtMjMuY2xlcmsuYWNjb3VudHMuZGV2JA";
+
+ReactDOM.render(
+  <ClerkProvider publishableKey={clerkFrontendApi}>
+      <App />
+  </ClerkProvider>,
+  document.getElementById('root')
+);

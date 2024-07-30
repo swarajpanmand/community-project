@@ -6,10 +6,12 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const { ClerkExpressRequireAuth } = require('@clerk/clerk-sdk-node');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 const upload = multer({ dest: 'uploads/' });
 
 // Connect to MongoDB
@@ -26,7 +28,8 @@ const complaintSchema = new mongoose.Schema({
   },
   date: Date,
   plateNumber: String,
-  imageUrl: String
+  imageUrl: String,
+  userId: String
 });
 
 complaintSchema.index({ location: '2dsphere' });
@@ -64,11 +67,13 @@ app.post('/api/read-plate', upload.single('upload'), async (req, res) => {
   }
 });
 
-app.post('/api/complaints', upload.single('image'), async (req, res) => {
+app.post('/api/complaints', ClerkExpressRequireAuth({}), upload.single('image'), async (req, res) => {
   try {
     const { complaint, latitude, longitude, date, plateNumber } = req.body;
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
     
+    const userId = req.auth.userId;
+
     const newComplaint = new Complaint({
       complaint,
       location: {
@@ -77,7 +82,8 @@ app.post('/api/complaints', upload.single('image'), async (req, res) => {
       },
       date: new Date(date),
       plateNumber,
-      imageUrl
+      imageUrl,
+      userId
     });
 
     await newComplaint.save();
@@ -88,9 +94,11 @@ app.post('/api/complaints', upload.single('image'), async (req, res) => {
   }
 });
 
-app.get('/api/complaints', async (req, res) => {
+app.get('/api/complaints', ClerkExpressRequireAuth({}), async (req, res) => {
   try {
-    const complaints = await Complaint.find().sort({ date: -1 });
+    const userId = req.auth.userId;
+
+    const complaints = await Complaint.find({ userId }).sort({ date: -1 });
     res.json(complaints);
   } catch (error) {
     console.error('Error fetching complaints:', error);
