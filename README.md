@@ -1,131 +1,136 @@
-
-
-
 # Road Safety Complaint System
 
-The Road Safety Complaint System is a web application that allows users to file complaints about road safety issues. Users can upload images, capture photos, and the system will automatically read license plates from the images using an external API. Complaints are then stored in a MongoDB database and can be viewed by all users.
+## Overview
+
+The Road Safety Complaint System is a web application that allows users to file and view complaints about road safety issues. The app features a license plate reader, a complaint form, and a complaints list. The system ensures that only authenticated users can file and view complaints.
 
 ## Features
 
-- **License Plate Reader**: Upload or capture images to extract license plate numbers.
-- **File a Complaint**: Submit a complaint with details, location, and images.
-- **View Complaints**: View a list of submitted complaints with their details and images.
-- **Geolocation**: Automatically fetch the user's current location for complaint submissions.
+- **License Plate Reader:** Users can upload images of license plates, and the system will extract and display the plate number.
+- **Complaint Form:** Authenticated users can file complaints, including uploading an image, capturing their current location, and auto-filling the license plate number.
+- **Complaints List:** Authenticated users can view a list of all complaints, including the details and images.
 
-## Technology Stack
+## Technologies Used
 
-- **Frontend**: React, React Router
-- **Backend**: Express.js, Multer, Mongoose
-- **Database**: MongoDB
-- **License Plate Recognition API**: Plate Recognizer API
+- **Frontend:** React, React Router, Clerk for authentication, Axios for API requests.
+- **Backend:** Node.js, Express, MongoDB, Mongoose, Multer for file uploads, Geolocation API.
+- **License Plate Recognition:** Third-party API integration.
 
 ## Installation
 
 ### Prerequisites
 
-- Node.js
+- Node.js and npm
 - MongoDB
+- Clerk account
 
 ### Steps
 
-1. Clone the repository:
-
-   ```bash
+1. **Clone the repository:**
+   ```sh
    git clone https://github.com/swarajpanmand/community-project.git
-   cd community-project
+   cd road-safety-complaint-system
    ```
 
-2. Install dependencies for both client and server:
+2. **Install dependencies:**
 
-   ```bash
-   cd client
-   npm install
-   cd ../server
-   npm install
-   ```
+   - For the server:
+     ```sh
+     cd server
+     npm install
+     ```
 
-3. Set up the MongoDB database. Make sure MongoDB is running and accessible on `mongodb://localhost:27017/complaints_db`.
+   - For the client:
+     ```sh
+     cd client
+     npm install
+     ```
 
-4. Configure environment variables in the server:
+3. **Set up environment variables:**
 
-   Create a `.env` file in the `server` directory with the following content:
+   - Create a `.env` file in the `server` directory with the following content:
+     ```
+     PORT=5000
+     MONGODB_URI=your-mongodb-uri
+     CLERK_API_KEY=your-clerk-api-key
+     CLERK_SECRET_KEY=your-clerk-secret-key
+     ```
 
-   ```env
-   MONGODB_URI=mongodb://localhost:27017/complaints_db
-   PLATE_RECOGNIZER_API_KEY=your_plate_recognizer_api_key
-   PORT=5000
-   ```
+   - Create a `.env` file in the `client` directory with the following content:
+     ```
+     REACT_APP_CLERK_FRONTEND_API=your-clerk-frontend-api
+     ```
 
-5. Run the server:
-
-   ```bash
+4. **Start the server:**
+   ```sh
    cd server
    npm start
    ```
 
-6. Run the client:
-
-   ```bash
+5. **Start the client:**
+   ```sh
    cd client
    npm run dev
    ```
 
-   The application should now be running at `http://localhost:5173`.
+6. **Open your browser and navigate to:**
+   ```
+   http://localhost:5173/
+   ```
 
-## Usage
+## Project Structure
 
-### License Plate Reader
-
-1. Navigate to the "License Plate Reader" page.
-2. Upload an image containing a license plate.
-3. The system will read the plate number and display it on the screen.
-
-### File a Complaint
-
-1. Navigate to the "File a Complaint" page.
-2. Fill out the complaint form.
-3. Optionally, upload an image or capture a photo using the camera.
-4. Submit the complaint.
-
-### View Complaints
-
-1. Navigate to the "View Complaints" page.
-2. Browse through the list of submitted complaints.
-
-## Directory Structure
-
-```plaintext
+```
 road-safety-complaint-system/
 ├── client/
 │   ├── public/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── ComplaintForm.jsx
-│   │   │   ├── ComplaintsList.jsx
-│   │   │   ├── LicensePlateReader.jsx
 │   │   ├── styles/
 │   │   ├── App.jsx
 │   │   ├── main.jsx
 │   ├── index.html
-│   ├── vite.config.js
 │   ├── package.json
+│   └── .env
 ├── server/
 │   ├── src/
+│   │   ├── routes/
+│   │   ├── models/
 │   │   ├── app.js
-│   ├── uploads/
-│   ├── .env
+│   │   ├── config.js
 │   ├── package.json
+│   └── .env
 ├── README.md
+└── .gitignore
 ```
+
+## Usage
+
+1. **Sign Up / Sign In:**
+   - Use the Sign In page to create an account or log in.
+
+2. **License Plate Reader:**
+   - Upload an image of a license plate to extract and display the plate number.
+
+3. **File a Complaint:**
+   - Navigate to the "File a Complaint" page, fill out the form, upload an image, and submit.
+
+4. **View Complaints:**
+   - Navigate to the "View Complaints" page to see a list of all complaints filed.
 
 ## Contributing
 
-Contributions are welcome! Please fork the repository and create a pull request.
+1. Fork the repository.
+2. Create a new branch (`git checkout -b feature-branch`).
+3. Make your changes.
+4. Commit your changes (`git commit -m 'Add some feature'`).
+5. Push to the branch (`git push origin feature-branch`).
+6. Open a pull request.
 
 
 ## Acknowledgements
 
-- [Plate Recognizer API](https://platerecognizer.com/)
-- [React](https://reactjs.org/)
-- [Express.js](https://expressjs.com/)
-- [MongoDB](https://www.mongodb.com/)
+- Thanks to the Clerk team for the authentication solution.
+- Thanks to the community for the continuous support and feedback.
+
+---
