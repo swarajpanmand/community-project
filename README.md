@@ -52,13 +52,9 @@ The Road Safety Complaint System is a web application that allows users to file 
      ```
      PORT=5000
      MONGODB_URI=your-mongodb-uri
-     CLERK_API_KEY=your-clerk-api-key
+     PLATE_RECOGNIZER_API_KEY=ypur-plate-recognizer-api-key
+     CLERK_PUBLISHABLE_KEY=your-clerk-api-key
      CLERK_SECRET_KEY=your-clerk-secret-key
-     ```
-
-   - Create a `.env` file in the `client` directory with the following content:
-     ```
-     REACT_APP_CLERK_FRONTEND_API=your-clerk-frontend-api
      ```
 
 4. **Start the server:**
