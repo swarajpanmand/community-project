@@ -29,7 +29,7 @@ The Road Safety Complaint System is a web application that allows users to file 
 1. **Clone the repository:**
    ```sh
    git clone https://github.com/swarajpanmand/community-project.git
-   cd road-safety-complaint-system
+   cd community-project
    ```
 
 2. **Install dependencies:**
