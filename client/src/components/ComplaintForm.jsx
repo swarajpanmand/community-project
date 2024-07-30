@@ -11,9 +11,8 @@ const ComplaintForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [plateNumber, setPlateNumber] = useState('');
-  const fileInputRef = useRef(null);
+  const [stream, setStream] = useState(null);
   const videoRef = useRef(null);
-  const canvasRef = useRef(null);
   const { getToken } = useAuth();
 
   useEffect(() => {
@@ -27,6 +26,10 @@ const ComplaintForm = () => {
     } else {
       setError("Geolocation is not available in your browser.");
     }
+
+    return () => {
+      stopCamera();
+    };
   }, []);
 
   const handleImageUpload = async (event) => {
@@ -40,19 +43,6 @@ const ComplaintForm = () => {
       reader.readAsDataURL(file);
       await extractPlateNumber(file);
     }
-  };
-
-  const handleCapture = async () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    canvas.toBlob(async (blob) => {
-      setImage(blob);
-      setImagePreview(canvas.toDataURL());
-      await extractPlateNumber(blob);
-    });
   };
 
   const extractPlateNumber = async (imageFile) => {
@@ -81,15 +71,47 @@ const ComplaintForm = () => {
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      videoRef.current.srcObject = stream;
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      videoRef.current.srcObject = mediaStream;
+      setStream(mediaStream);
     } catch (err) {
       console.error("Error accessing camera:", err);
+      setError("Failed to access the camera. Please ensure you've granted the necessary permissions.");
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    }
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      canvas.getContext('2d').drawImage(videoRef.current, 0, 0);
+      canvas.toBlob(async (blob) => {
+        if (blob) {
+          setImage(blob);
+          setImagePreview(canvas.toDataURL());
+          await extractPlateNumber(blob);
+        }
+      }, 'image/jpeg');
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!complaint.trim()) {
+      setError('Please enter a complaint before submitting.');
+      return;
+    }
     setIsLoading(true);
     setError('');
 
@@ -122,7 +144,7 @@ const ComplaintForm = () => {
   };
 
   return (
-    <div>
+    <div className="complaint-form">
       <h2>File a Complaint</h2>
       <form onSubmit={handleSubmit}>
         <div className="form-group">
@@ -145,18 +167,24 @@ const ComplaintForm = () => {
             type="file"
             accept="image/*"
             onChange={handleImageUpload}
-            ref={fileInputRef}
           />
         </div>
-        <div className="form-group">
-          <button type="button" onClick={startCamera}>Use Camera</button>
-          <button type="button" onClick={handleCapture}>Capture Photo</button>
+        <div className="form-group camera-controls">
+          {!stream ? (
+            <button type="button" onClick={startCamera}>Start Camera</button>
+          ) : (
+            <>
+              <button type="button" onClick={stopCamera}>Stop Camera</button>
+              <button type="button" onClick={capturePhoto}>Capture Photo</button>
+            </>
+          )}
         </div>
-        <video ref={videoRef} style={{ display: 'none' }} autoPlay />
-        <canvas ref={canvasRef} style={{ display: 'none' }} />
+        <div className="camera-preview">
+          <video ref={videoRef} autoPlay playsInline />
+        </div>
         {imagePreview && (
           <div className="form-group">
-            <img src={imagePreview} alt="Preview" style={{ maxWidth: '100%', maxHeight: '200px' }} />
+            <img src={imagePreview} alt="Preview" className="image-preview" />
           </div>
         )}
         {plateNumber && <p>Detected Plate Number: <span className="plate-number">{plateNumber}</span></p>}

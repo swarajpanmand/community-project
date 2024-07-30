@@ -1,0 +1,723 @@
+// File: client/index.html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Community Project</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+
+// File: client/src/App.jsx
+import React from 'react';
+import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
+import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
+import LicensePlateReader from './components/LicensePlateReader';
+import ComplaintForm from './components/ComplaintForm';
+import ComplaintsList from './components/ComplaintsList';
+import SignInPage from './components/SignInPage';
+import SignOutButton from './components/SignOut';
+
+const App = () => {
+  return (
+    <Router>
+      <div className="container">
+        <header className="header">
+          <h1>Road Safety Complaint System</h1>
+        </header>
+        <nav className="nav">
+          <ul>
+            <li><Link to="/">License Plate Reader</Link></li>
+            <SignedIn>
+              <li><Link to="/complaint">File a Complaint</Link></li>
+              <li><Link to="/complaints">View Complaints</Link></li>
+              <li><SignOutButton /></li>
+            </SignedIn>
+            <SignedOut>
+              <li><Link to="/sign-in">Sign In</Link></li>
+            </SignedOut>
+          </ul>
+        </nav>
+
+        <main className="content">
+          <Routes>
+            <Route path="/" element={<LicensePlateReader />} />
+            <Route
+              path="/complaint"
+              element={
+                <SignedIn>
+                  <ComplaintForm />
+                </SignedIn>
+              }
+            />
+            <Route
+              path="/complaints"
+              element={
+                <SignedIn>
+                  <ComplaintsList />
+                </SignedIn>
+              }
+            />
+            <Route path="/sign-in" element={<SignInPage />} />
+            <Route
+              path="/complaint"
+              element={
+                <SignedOut>
+                  <RedirectToSignIn />
+                </SignedOut>
+              }
+            />
+            <Route
+              path="/complaints"
+              element={
+                <SignedOut>
+                  <RedirectToSignIn />
+                </SignedOut>
+              }
+            />
+          </Routes>
+        </main>
+      </div>
+    </Router>
+  );
+}
+
+export default App;
+
+// File: client/src/components/ComplaintForm.jsx
+import React, { useState, useRef, useEffect } from 'react';
+import axios from 'axios';
+import { useAuth } from '@clerk/clerk-react';
+import '../styles/RoadSafety.css';
+
+const ComplaintForm = () => {
+  const [complaint, setComplaint] = useState('');
+  const [location, setLocation] = useState({ latitude: '', longitude: '' });
+  const [image, setImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [plateNumber, setPlateNumber] = useState('');
+  const fileInputRef = useRef(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(function(position) {
+        setLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        });
+      });
+    } else {
+      setError("Geolocation is not available in your browser.");
+    }
+  }, []);
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+      await extractPlateNumber(file);
+    }
+  };
+
+  const handleCapture = async () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    canvas.toBlob(async (blob) => {
+      setImage(blob);
+      setImagePreview(canvas.toDataURL());
+      await extractPlateNumber(blob);
+    });
+  };
+
+  const extractPlateNumber = async (imageFile) => {
+    setIsLoading(true);
+    setError('');
+    const formData = new FormData();
+    formData.append('upload', imageFile);
+
+    try {
+      const response = await axios.post('http://localhost:5000/api/read-plate', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data && response.data.results && response.data.results.length > 0) {
+        setPlateNumber(response.data.results[0].plate);
+      } else {
+        setError('No plate number found in the image');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setError(`Error extracting plate number: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      videoRef.current.srcObject = stream;
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    const formData = new FormData();
+    formData.append('complaint', complaint);
+    formData.append('latitude', location.latitude);
+    formData.append('longitude', location.longitude);
+    formData.append('date', new Date().toISOString());
+    formData.append('plateNumber', plateNumber);
+    if (image) formData.append('image', image);
+
+    try {
+      const token = await getToken();
+      await axios.post('http://localhost:5000/api/complaints', formData, {
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      setComplaint('');
+      setImage(null);
+      setImagePreview(null);
+      setPlateNumber('');
+    } catch (error) {
+      console.error('Error:', error);
+      setError(`Error: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <h2>File a Complaint</h2>
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label htmlFor="complaint">Complaint:</label>
+          <textarea
+            id="complaint"
+            value={complaint}
+            onChange={(e) => setComplaint(e.target.value)}
+            placeholder="Enter your complaint"
+            required
+          />
+        </div>
+        <div className="form-group">
+          <p>Location: Latitude: {location.latitude}, Longitude: {location.longitude}</p>
+        </div>
+        <div className="form-group">
+          <label htmlFor="imageUpload">Upload an image:</label>
+          <input
+            id="imageUpload"
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            ref={fileInputRef}
+          />
+        </div>
+        <div className="form-group">
+          <button type="button" onClick={startCamera}>Use Camera</button>
+          <button type="button" onClick={handleCapture}>Capture Photo</button>
+        </div>
+        <video ref={videoRef} style={{ display: 'none' }} autoPlay />
+        <canvas ref={canvasRef} style={{ display: 'none' }} />
+        {imagePreview && (
+          <div className="form-group">
+            <img src={imagePreview} alt="Preview" style={{ maxWidth: '100%', maxHeight: '200px' }} />
+          </div>
+        )}
+        {plateNumber && <p>Detected Plate Number: <span className="plate-number">{plateNumber}</span></p>}
+        <button type="submit" disabled={isLoading}>
+          {isLoading ? 'Submitting...' : 'Submit Complaint'}
+        </button>
+      </form>
+      {error && <p className="error">{error}</p>}
+    </div>
+  );
+};
+
+export default ComplaintForm;
+
+// File: client/src/components/ComplaintsList.jsx
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useAuth } from '@clerk/clerk-react';
+import '../styles/RoadSafety.css';
+
+const ComplaintsList = () => {
+  const [complaints, setComplaints] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    const fetchComplaints = async () => {
+      try {
+        const token = await getToken();
+        const response = await axios.get('http://localhost:5000/api/complaints', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setComplaints(response.data);
+      } catch (error) {
+        console.error('Error fetching complaints:', error);
+        setError('Failed to fetch complaints');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchComplaints();
+  }, [getToken]);
+
+  if (isLoading) return <div className="loading">Loading...</div>;
+  if (error) return <div className="error">Error: {error}</div>;
+
+  return (
+    <div>
+      <h2>Complaints List</h2>
+      {complaints.map((complaint, index) => (
+        <div key={index} className="complaint-item">
+          <p>Date: {new Date(complaint.date).toLocaleString()}</p>
+          <p>Location: Latitude: {complaint.location.coordinates[1]}, Longitude: {complaint.location.coordinates[0]}</p>
+          <p>Complaint: {complaint.complaint}</p>
+          <p>Plate Number: <span className="plate-number">{complaint.plateNumber}</span></p>
+          {complaint.imageUrl && (
+            <img src={`http://localhost:5000${complaint.imageUrl}`} alt="Complaint" style={{ maxWidth: '100%', maxHeight: '200px' }} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default ComplaintsList;
+
+// File: client/src/components/LicensePlateReader.jsx
+import React, { useState } from 'react';
+import axios from 'axios';
+import '../styles/RoadSafety.css';
+
+const LicensePlateReader = () => {
+  const [plateNumber, setPlateNumber] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [imagePreview, setImagePreview] = useState(null);
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+
+      const formData = new FormData();
+      formData.append('upload', file);
+
+      setIsLoading(true);
+      setError('');
+
+      try {
+        const response = await axios.post('http://localhost:5000/api/read-plate', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        if (response.data && response.data.results && response.data.results.length > 0) {
+          setPlateNumber(response.data.results[0].plate);
+        } else {
+          setError('No plate number found in the response');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        setError(`Error: ${error.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  return (
+    <div>
+      <h2>License Plate Reader</h2>
+      <div className="form-group">
+        <label htmlFor="imageUpload">Upload an image:</label>
+        <input id="imageUpload" type="file" accept="image/*" onChange={handleImageUpload} />
+      </div>
+      {imagePreview && (
+        <div className="form-group">
+          <h3>Uploaded Image:</h3>
+          <img src={imagePreview} alt="Uploaded license plate" style={{ maxWidth: '100%', maxHeight: '300px' }} />
+        </div>
+      )}
+      {isLoading ? (
+        <p className="loading">Reading license plate...</p>
+      ) : plateNumber ? (
+        <p>License Plate: <span className="plate-number">{plateNumber}</span></p>
+      ) : error ? (
+        <p className="error">Error: {error}</p>
+      ) : null}
+    </div>
+  );
+};
+
+export default LicensePlateReader;
+// File: client/src/components/SignInPage.jsx
+import React from 'react';
+import { SignIn } from '@clerk/clerk-react';
+
+const SignInPage = () => {
+  return (
+    <div>
+      <h2>Sign In</h2>
+      <SignIn />
+    </div>
+  );
+}
+
+export default SignInPage;
+
+// File: client/src/components/SignOut.jsx
+import React from 'react';
+import { useClerk } from '@clerk/clerk-react';
+import { useNavigate } from 'react-router-dom';
+
+const SignOutButton = () => {
+  const { signOut } = useClerk();
+  const navigate = useNavigate();
+
+  const handleSignOut = () => {
+    signOut().then(() => {
+      navigate('/');
+    });
+  };
+
+  return (
+    <button onClick={handleSignOut}>
+      Sign Out
+    </button>
+  );
+}
+
+export default SignOutButton;
+
+// File: client/src/main.jsx
+import React from 'react';
+import ReactDOM from 'react-dom';
+import { ClerkProvider, RedirectToSignIn, SignedIn, SignedOut } from '@clerk/clerk-react';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App';
+
+const clerkFrontendApi = "pk_test_cHJvdmVuLXRlcm1pdGUtMjMuY2xlcmsuYWNjb3VudHMuZGV2JA";
+
+ReactDOM.render(
+  <ClerkProvider publishableKey={clerkFrontendApi}>
+      <App />
+  </ClerkProvider>,
+  document.getElementById('root')
+);
+
+// File: client/src/styles/App.css
+
+// File: client/src/styles/index.css
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+
+// File: client/src/styles/RoadSafety.css
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #f0f0f0;
+    color: #333;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+  }
+  
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  
+  .header {
+    background-color: #ffcc00;
+    color: #000;
+    padding: 20px 0;
+    text-align: center;
+    border-bottom: 5px solid #000;
+  }
+  
+  .header h1 {
+    margin: 0;
+    font-size: 2.5em;
+  }
+  
+  .nav {
+    background-color: #000;
+    padding: 10px 0;
+  }
+  
+  .nav ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+  }
+  
+  .nav li {
+    margin: 0 15px;
+  }
+  
+  .nav a {
+    color: #fff;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1.1em;
+    transition: color 0.3s ease;
+  }
+  
+  .nav a:hover {
+    color: #ffcc00;
+  }
+  
+  .content {
+    background-color: #fff;
+    padding: 20px;
+    margin-top: 20px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    flex-grow: 1;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+  }
+  
+  input[type="text"],
+  input[type="file"],
+  textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+  
+  button {
+    background-color: #ff4136;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  button:hover {
+    background-color: #ff1a1a;
+  }
+  
+  .complaint-item {
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 20px;
+  }
+  
+  .complaint-item img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+  }
+  
+  .error {
+    color: #ff4136;
+    font-weight: bold;
+  }
+  
+  .loading {
+    text-align: center;
+    font-size: 1.2em;
+    margin: 20px 0;
+  }
+  
+  .plate-number {
+    background-color: #ffcc00;
+    color: #000;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-weight: bold;
+    display: inline-block;
+  }
+// File: server/src/app.js
+const express = require('express');
+const multer = require('multer');
+const fetch = require('node-fetch');
+const FormData = require('form-data');
+const fs = require('fs');
+const path = require('path');
+const cors = require('cors');
+const mongoose = require('mongoose');
+const { ClerkExpressRequireAuth } = require('@clerk/clerk-sdk-node');
+require('dotenv').config();
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+const upload = multer({ dest: 'uploads/' });
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('Could not connect to MongoDB', err));
+
+// Define Complaint Schema
+const complaintSchema = new mongoose.Schema({
+  complaint: String,
+  location: {
+    type: { type: String },
+    coordinates: [Number]
+  },
+  date: Date,
+  plateNumber: String,
+  imageUrl: String,
+  userId: String
+});
+
+complaintSchema.index({ location: '2dsphere' });
+
+const Complaint = mongoose.model('Complaint', complaintSchema);
+
+app.post('/api/read-plate', upload.single('upload'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const imagePath = req.file.path;
+    const body = new FormData();
+    body.append('upload', fs.createReadStream(imagePath));
+    body.append('regions', 'in'); 
+
+    const response = await fetch('https://api.platerecognizer.com/v1/plate-reader/', {
+      method: 'POST',
+      headers: {
+        Authorization: process.env.PLATE_RECOGNIZER_API_KEY,
+      },
+      body: body,
+    });
+
+    const data = await response.json();
+
+    // Delete the temporary file
+    fs.unlinkSync(imagePath);
+
+    res.json(data);
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/complaints', ClerkExpressRequireAuth({}), upload.single('image'), async (req, res) => {
+  try {
+    const { complaint, latitude, longitude, date, plateNumber } = req.body;
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    
+    const userId = req.auth.userId;
+
+    const newComplaint = new Complaint({
+      complaint,
+      location: {
+        type: 'Point',
+        coordinates: [parseFloat(longitude), parseFloat(latitude)]
+      },
+      date: new Date(date),
+      plateNumber,
+      imageUrl,
+      userId
+    });
+
+    await newComplaint.save();
+    res.status(201).json({ message: 'Complaint submitted successfully' });
+  } catch (error) {
+    console.error('Error saving complaint:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/complaints', ClerkExpressRequireAuth({}), async (req, res) => {
+  try {
+    const userId = req.auth.userId;
+
+    const complaints = await Complaint.find({ userId }).sort({ date: -1 });
+    res.json(complaints);
+  } catch (error) {
+    console.error('Error fetching complaints:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Serve uploaded images
+app.use('/uploads', express.static('uploads'));
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
